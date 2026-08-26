@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     RMBG_DIR: Path = MODELS_DIR / "rmbg"
     VIDEO_MODELS_DIR: Path = MODELS_DIR / "video"
 
-    ALLOWED_PHOTO_EXT: List[str] = [".jpg", ".jpeg", ".png", ".webp", ".bmp"]
+    ALLOWED_PHOTO_EXT: List[str] = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".avif",]
     ALLOWED_VIDEO_EXT: List[str] = [".mp4", ".mov", ".avi", ".mkv", ".webm"]
 
     MAX_UPLOAD_SIZE_MB: int = 500

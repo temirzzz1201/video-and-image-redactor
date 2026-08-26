@@ -6,47 +6,111 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.core.config import settings
 from app.schemas.job import JobCreateResponse, JobType
-from app.schemas.video import VideoColorCorrectRequest, VideoInterpolateRequest, VideoUpscaleRequest
-from app.workers.tasks import task_video_color_correct, task_video_interpolate, task_video_upscale
+from app.schemas.video import (
+    VideoColorCorrectRequest,
+    VideoInterpolateRequest,
+    VideoUpscaleRequest,
+)
+from app.workers.tasks import (
+    task_video_color_correct,
+    task_video_interpolate,
+    task_video_upscale,
+)
 
 router = APIRouter(prefix="/video", tags=["video"])
 
 
 def _save_upload(file: UploadFile) -> Path:
-    ext = Path(file.filename).suffix.lower()
-    if ext not in settings.ALLOWED_VIDEO_EXT:
-        raise HTTPException(status_code=400, detail=f"Недопустимый формат файла: {ext}")
+    """
+    Сохраняет загруженный через API файл во временную директорию.
 
-    dest_dir = settings.INPUT_DIR / "videos"
+    data/input/ используется только для исходников,
+    которые пользователь хранит сам.
+
+    API-загрузки идут в:
+        data/temp/uploads/
+    """
+
+    ext = Path(file.filename or "").suffix.lower()
+
+    if ext not in settings.ALLOWED_VIDEO_EXT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Недопустимый формат файла: {ext}",
+        )
+
+    # Временная директория для файлов, загруженных через API
+    dest_dir = settings.TEMP_DIR / "uploads"
     dest_dir.mkdir(parents=True, exist_ok=True)
+
+    # Уникальное имя, чтобы параллельные задачи не конфликтовали
     dest_path = dest_dir / f"{uuid.uuid4().hex}{ext}"
 
-    with dest_path.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        with dest_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception:
+        # Если запись не удалась — удаляем недописанный файл
+        dest_path.unlink(missing_ok=True)
+        raise
+    finally:
+        file.file.close()
 
     return dest_path
 
 
 @router.post("/upscale", response_model=JobCreateResponse)
-async def upscale_video(file: UploadFile = File(...), scale: int = 2, face_enhance: bool = False) -> JobCreateResponse:
+async def upscale_video(
+    file: UploadFile = File(...),
+    scale: int = 2,
+    face_enhance: bool = False,
+) -> JobCreateResponse:
+
     input_path = _save_upload(file)
-    params = VideoUpscaleRequest(scale=scale, face_enhance=face_enhance)
+
+    params = VideoUpscaleRequest(
+        scale=scale,
+        face_enhance=face_enhance,
+    )
 
     job_id = uuid.uuid4().hex
-    task_video_upscale.delay(job_id, str(input_path), params.model_dump())
 
-    return JobCreateResponse(job_id=job_id, job_type=JobType.VIDEO_UPSCALE)
+    task_video_upscale.delay(
+        job_id,
+        str(input_path),
+        params.model_dump(),
+    )
+
+    return JobCreateResponse(
+        job_id=job_id,
+        job_type=JobType.VIDEO_UPSCALE,
+    )
 
 
 @router.post("/interpolate", response_model=JobCreateResponse)
-async def interpolate_video(file: UploadFile = File(...), target_fps: int = 60) -> JobCreateResponse:
+async def interpolate_video(
+    file: UploadFile = File(...),
+    target_fps: int = 60,
+) -> JobCreateResponse:
+
     input_path = _save_upload(file)
-    params = VideoInterpolateRequest(target_fps=target_fps)
+
+    params = VideoInterpolateRequest(
+        target_fps=target_fps,
+    )
 
     job_id = uuid.uuid4().hex
-    task_video_interpolate.delay(job_id, str(input_path), params.model_dump())
 
-    return JobCreateResponse(job_id=job_id, job_type=JobType.VIDEO_INTERPOLATE)
+    task_video_interpolate.delay(
+        job_id,
+        str(input_path),
+        params.model_dump(),
+    )
+
+    return JobCreateResponse(
+        job_id=job_id,
+        job_type=JobType.VIDEO_INTERPOLATE,
+    )
 
 
 @router.post("/color-correct", response_model=JobCreateResponse)
@@ -56,10 +120,25 @@ async def color_correct_video(
     contrast: float = 1.0,
     saturation: float = 1.0,
 ) -> JobCreateResponse:
+
     input_path = _save_upload(file)
-    params = VideoColorCorrectRequest(brightness=brightness, contrast=contrast, saturation=saturation)
+
+    params = VideoColorCorrectRequest(
+        brightness=brightness,
+        contrast=contrast,
+        saturation=saturation,
+    )
 
     job_id = uuid.uuid4().hex
-    task_video_color_correct.delay(job_id, str(input_path), params.model_dump())
 
-    return JobCreateResponse(job_id=job_id, job_type=JobType.VIDEO_COLOR_CORRECT)
+    task_video_color_correct.delay(
+        job_id,
+        str(input_path),
+        params.model_dump(),
+    )
+
+    return JobCreateResponse(
+        job_id=job_id,
+        job_type=JobType.VIDEO_COLOR_CORRECT,
+    )
+

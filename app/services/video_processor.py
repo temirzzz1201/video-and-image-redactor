@@ -68,6 +68,12 @@ class VideoProcessorService:
             frame = cv2.imread(str(frame_path))
             processed = self.upscaler.process_frame(frame, scale=scale)
 
+            processed = self.upscaler.enhance_details(
+                processed,
+                amount=0.25,
+                sigma=1.0,
+            )
+
             if face_enhance:
                 processed = self.face_enhancer.process_frame(processed)
 

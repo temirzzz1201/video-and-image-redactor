@@ -65,23 +65,88 @@ def get_job_status(job_id: str) -> Optional[JobStatusResponse]:
 def _make_output_path(input_path: Path, output_root: Path, suffix: str) -> Path:
     return output_root / f"{input_path.stem}_{suffix}{input_path.suffix}"
 
+def _cleanup_input_file(input_path: Path) -> None:
+    """
+    Удаляет временный файл, загруженный через API.
+    Никогда не удаляет файлы из data/input.
+    """
+    try:
+        if input_path.is_file() and settings.TEMP_DIR in input_path.parents:
+            input_path.unlink()
+            logger.info(f"Удалён временный файл: {input_path}")
+    except Exception:
+        logger.exception(f"Не удалось удалить временный файл: {input_path}")
+
+
+
+@celery_app.task(bind=True, name="video.upscale")
+def task_video_upscale(self, job_id: str, input_path: str, params: dict):
+    in_path = Path(input_path)
+
+    try:
+        out_path = _make_output_path(
+            in_path,
+            settings.OUTPUT_DIR / "video",
+            "upscaled",
+        )
+
+        result_path = _video_processor.upscale_video(
+            job_id,
+            in_path,
+            out_path,
+            scale=params.get("scale", 2),
+            face_enhance=params.get("face_enhance", False),
+        )
+
+        return {
+            "job_type": JobType.VIDEO_UPSCALE.value,
+            "result_path": str(result_path),
+            "progress": 100.0,
+        }
+
+    except Exception as exc:
+        logger.exception(
+            f"[{job_id}] Ошибка апскейла видео"
+        )
+        raise exc
+
+    finally:
+        _cleanup_input_file(in_path)
 
 @celery_app.task(bind=True, name="photo.upscale")
 def task_photo_upscale(self, job_id: str, input_path: str, params: dict):
     try:
         in_path = Path(input_path)
-        out_path = _make_output_path(in_path, settings.OUTPUT_DIR / "photos", "upscaled")
 
-        result_path = _upscaler.process(in_path, out_path, scale=params.get("scale", 2))
+        out_path = _make_output_path(
+            in_path,
+            settings.OUTPUT_DIR / "photos",
+            "upscaled",
+        )
+
+        result_path = _upscaler.process(
+            in_path,
+            out_path,
+            scale=params.get("scale", 2),
+        )
 
         if params.get("face_enhance"):
-            result_path = _face_enhancer.process(result_path, result_path)
+            result_path = _face_enhancer.process(
+                result_path,
+                result_path,
+            )
 
-        return {"job_type": JobType.PHOTO_UPSCALE.value, "result_path": str(result_path), "progress": 100.0}
+        return {
+            "job_type": JobType.PHOTO_UPSCALE.value,
+            "result_path": str(result_path),
+            "progress": 100.0,
+        }
+
     except Exception as exc:
-        logger.exception(f"[{job_id}] Ошибка апскейла фото")
+        logger.exception(
+            f"[{job_id}] Ошибка апскейла фото"
+        )
         raise exc
-
 
 @celery_app.task(bind=True, name="photo.face_enhance")
 def task_photo_face_enhance(self, job_id: str, input_path: str, params: dict):

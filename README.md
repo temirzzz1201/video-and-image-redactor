@@ -61,6 +61,7 @@ VideoEnhancer/
 ## Запуск
 
 Перед запуском нужны:
+
 - **Redis** (брокер и backend Celery): `redis-server`
 - **ffmpeg** в PATH (для видео-пайплайна)
 - Веса моделей, положенные в соответствующие папки `models/`:
@@ -79,17 +80,20 @@ chmod +x start.sh
 
 ## Основные эндпоинты
 
-| Метод | Путь | Описание |
-|---|---|---|
-| POST | `/api/photo/upscale` | Апскейл фото |
-| POST | `/api/photo/face-enhance` | Улучшение лиц на фото |
-| POST | `/api/photo/remove-background` | Удаление фона |
-| POST | `/api/photo/remove-object` | Удаление объекта по маске |
-| POST | `/api/photo/color-correct` | Цветокоррекция фото |
-| POST | `/api/video/upscale` | Апскейл видео |
-| POST | `/api/video/interpolate` | Повышение FPS видео |
-| POST | `/api/video/color-correct` | Цветокоррекция видео |
-| GET | `/api/jobs/{job_id}` | Статус фоновой задачи |
+| Метод | Путь                           | Описание                  |
+| ----- | ------------------------------ | ------------------------- |
+| POST  | `/api/photo/upscale`           | Апскейл фото              |
+| POST  | `/api/photo/face-enhance`      | Улучшение лиц на фото     |
+| POST  | `/api/photo/remove-background` | Удаление фона             |
+| POST  | `/api/photo/remove-object`     | Удаление объекта по маске |
+| POST  | `/api/photo/color-correct`     | Цветокоррекция фото       |
+| POST  | `/api/video/upscale`           | Апскейл видео             |
+| POST  | `/api/video/interpolate`       | Повышение FPS видео       |
+| POST  | `/api/video/color-correct`     | Цветокоррекция видео      |
+| GET   | `/api/jobs/{job_id}`           | Статус фоновой задачи     |
 
 Все операции асинхронные: эндпоинт сразу возвращает `job_id`,
 а результат проверяется через `/api/jobs/{job_id}`.
+
+curl -X POST "http://127.0.0.1:8000/api/video/upscale?scale=2&face_enhance=false" \
+ -F "file=@/home/zero/Desktop/VideoEnhancer/data/input/videos/test.mp4"

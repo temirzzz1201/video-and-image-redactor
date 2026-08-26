@@ -41,17 +41,32 @@ def extract_frames(video_path: Path, output_dir: Path, pattern: str = "frame_%08
     _run(cmd)
     return sorted(output_dir.glob("frame_*.png"))
 
-
-def frames_to_video(frames_dir: Path, output_path: Path, fps: float, pattern: str = "frame_%08d.png") -> Path:
-    """Собирает видео обратно из последовательности кадров-изображений."""
+def frames_to_video(
+    frames_dir: Path,
+    output_path: Path,
+    fps: float,
+    pattern: str = "frame_%08d.png",
+) -> Path:
+    """Собирает видео обратно из последовательности кадров."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
     cmd = [
-        settings.FFMPEG_BIN, "-y",
+        settings.FFMPEG_BIN,
+        "-y",
         "-framerate", str(fps),
         "-i", str(frames_dir / pattern),
-        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+
+        # Качественное кодирование H.264
+        "-c:v", "libx264",
+        "-preset", "medium",
+        "-crf", "18",
+
+        # Совместимость с большинством плееров
+        "-pix_fmt", "yuv420p",
+
         str(output_path),
     ]
+
     _run(cmd)
     return output_path
 
